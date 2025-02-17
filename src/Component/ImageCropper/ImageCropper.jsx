@@ -10,6 +10,8 @@ function ImageCropper() {
   useEffect(() => {
     const loadModels = async () => {
       await faceapi.nets.tinyFaceDetector.loadFromUri('/models');
+      await faceapi.nets.faceLandmark68Net.loadFromUri('/models');
+      await faceapi.nets.faceRecognitionNet.loadFromUri('/models');
     };
     loadModels();
   }, []);
@@ -34,26 +36,17 @@ function ImageCropper() {
     const img = new Image();
     img.src = imageSrc;
     img.onload = async () => {
-      const detections = await faceapi.detectAllFaces(img, new faceapi.TinyFaceDetectorOptions());
+      const detections = await faceapi.detectAllFaces(img, new faceapi.TinyFaceDetectorOptions()).withFaceLandmarks().withFaceDescriptors();
       if (detections.length > 0) {
         const { x, y, width, height } = detections[0].box;
         const cropper = cropperRef.current.cropper;
-        const imageData = cropper.getImageData();
-        
-        // Calculate the center of the face
-        const centerX = x + width / 2;
-        const centerY = y + height / 2;
 
-        // Calculate the crop box size
-        const cropBoxWidth = Math.min(width * 2, imageData.naturalWidth);
-        const cropBoxHeight = Math.min(height * 2, imageData.naturalHeight);
-
-        // Set the crop box to center the face
+        // Set the crop box to the detected face's bounding box
         cropper.setCropBoxData({
-          left: Math.max(centerX - cropBoxWidth / 2, 0),
-          top: Math.max(centerY - cropBoxHeight / 2, 0),
-          width: cropBoxWidth,
-          height: cropBoxHeight,
+          left: x,
+          top: y,
+          width: width,
+          height: height,
         });
       }
     };
@@ -61,10 +54,31 @@ function ImageCropper() {
 
   const getCroppedImage = () => {
     const cropper = cropperRef.current.cropper;
-    const croppedImage = cropper.getCroppedCanvas().toDataURL();
+    const croppedCanvas = cropper.getCroppedCanvas();
+    const croppedImage = croppedCanvas.toDataURL();
+    const previewImageElement = document.getElementById('previewImage');
+    if (previewImageElement) {
+      previewImageElement.src = croppedImage;
+    }
+    
+    // Create a circular mask on the cropped image
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    const size = Math.min(croppedCanvas.width, croppedCanvas.height);
+    canvas.width = size;
+    canvas.height = size;
+
+    ctx.beginPath();
+    ctx.arc(size / 2, size / 2, size / 2, 0, Math.PI * 2);
+    ctx.closePath();
+    ctx.clip();
+
+    ctx.drawImage(croppedCanvas, 0, 0, size, size);
+
+    const circularImage = canvas.toDataURL();
     const link = document.createElement('a');
-    link.href = croppedImage;
-    link.download = 'cropped-image.png';
+    link.href = circularImage;
+    link.download = 'circular-cropped-image.png';
     link.click();
   };
 
@@ -75,14 +89,14 @@ function ImageCropper() {
         type="file"
         accept="image/*"
         onChange={onImageChange}
-        className="mb-4 p-2 border border-gray-300 rounded-md shadow-sm"
+        className="mb-4 p-2 border border-gray-300 rounded-xl shadow-sm"
       />
       {image && (
         <div className="w-full max-w-2xl mb-4">
           <Cropper
             src={image}
             style={{ height: 400, width: '100%' }}
-            aspectRatio={1} // Change this to 4/5 or 16/9 as needed
+            aspectRatio={1} // Aspect ratio set to 1:1 for square crop
             guides={false}
             ref={cropperRef}
           />
@@ -92,7 +106,7 @@ function ImageCropper() {
         onClick={getCroppedImage}
         className="bg-blue-500 text-white px-4 py-2 rounded-md shadow-md hover:bg-blue-600 transition duration-300"
       >
-        Download Cropped Image
+        Download Circular Cropped Image
       </button>
     </div>
   );
