@@ -106,7 +106,7 @@ const ImageCropper = () => {
     <div className="min-h-screen bg-gray-100 flex justify-center items-center p-6">
       <div className="w-full max-w-4xl bg-white p-8 rounded-xl shadow-lg">
         <h1 className="text-3xl font-semibold text-gray-800 mb-6 text-center">
-          Face
+          Face Detection Tools 
         </h1>
 
   
